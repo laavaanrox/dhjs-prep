@@ -445,9 +445,14 @@ document.addEventListener('DOMContentLoaded', function() {
   const navToggle = document.getElementById('navToggle');
   const navMenu = document.getElementById('navMenu');
   if (navToggle && navMenu) {
-    navToggle.addEventListener('click', () => navMenu.classList.toggle('open'));
+    navToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      navMenu.classList.toggle('open');
+    });
     document.addEventListener('click', (e) => {
-      if (!navToggle.contains(e.target) && !navMenu.contains(e.target)) {
+      if (navMenu.classList.contains('open') &&
+          !navToggle.contains(e.target) &&
+          !navMenu.contains(e.target)) {
         navMenu.classList.remove('open');
       }
     });

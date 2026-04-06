@@ -545,15 +545,10 @@
         });
       }
 
-      // Navbar scroll effect
+      // Navbar scroll effect (inline — app.js handles toggle)
       window.addEventListener('scroll', () => {
         document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 50);
-      });
-
-      // Mobile menu
-      document.getElementById('navToggle').addEventListener('click', () => {
-        document.getElementById('navMenu').classList.toggle('open');
-      });
+      }, { passive: true });
     });
   </script>
 </body>
