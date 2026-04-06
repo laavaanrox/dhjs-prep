@@ -1,0 +1,49 @@
+{
+  "name": "DHJS Prep — Delhi Higher Judicial Service Exam",
+  "short_name": "DhjsPrep",
+  "description": "Free DHJS exam preparation with MCQ practice, study plan, and landmark cases.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d1b5e",
+  "theme_color": "#1a237e",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/home.png",
+      "sizes": "1280x720",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["education", "utilities"],
+  "lang": "en-IN",
+  "shortcuts": [
+    {
+      "name": "Practice Quiz",
+      "short_name": "Quiz",
+      "description": "Start MCQ practice",
+      "url": "/quiz.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Study Plan",
+      "short_name": "Plan",
+      "description": "View 6-month study plan",
+      "url": "/studyplan.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
