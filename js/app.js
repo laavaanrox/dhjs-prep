@@ -346,12 +346,97 @@ function initQuizPage() {
       </div>
     `;
 
+    if (r.pct >= 70) setTimeout(launchConfetti, 400);
+
     if (typeof gtag !== 'undefined') {
       gtag('event', 'quiz_complete', { score_pct: r.pct, correct: r.correct, total: r.total, subject });
     }
   }
 
   renderSetup();
+}
+
+// ===== ANIMATED COUNTER =====
+function animateCounter(el, target, duration = 1500) {
+  const start = performance.now();
+  const startVal = 0;
+  function step(now) {
+    const elapsed = now - start;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    el.textContent = Math.round(startVal + (target - startVal) * eased) + (target === 100 ? '%' : '+');
+    if (progress < 1) requestAnimationFrame(step);
+    else el.textContent = target + (el.dataset.suffix || '+');
+  }
+  requestAnimationFrame(step);
+}
+
+// ===== SCROLL REVEAL =====
+function initScrollReveal() {
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.reveal, .reveal-left, .reveal-right').forEach(el => observer.observe(el));
+}
+
+// ===== ANIMATED PROGRESS BARS (study plan teaser) =====
+function initProgressBars() {
+  const bars = document.querySelectorAll('.mp-fill');
+  if (!bars.length) return;
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        setTimeout(() => entry.target.classList.add('animated'), 200);
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.3 });
+  bars.forEach(bar => observer.observe(bar));
+}
+
+// ===== HERO COUNTERS =====
+function initHeroCounters() {
+  const counters = document.querySelectorAll('.stat-number[data-count]');
+  if (!counters.length) return;
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const target = parseInt(entry.target.dataset.count);
+        animateCounter(entry.target, target);
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.5 });
+  counters.forEach(el => observer.observe(el));
+}
+
+// ===== CONFETTI =====
+function launchConfetti() {
+  const colors = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#fbbf24'];
+  for (let i = 0; i < 60; i++) {
+    setTimeout(() => {
+      const piece = document.createElement('div');
+      piece.className = 'confetti-piece';
+      piece.style.cssText = `
+        left: ${Math.random() * 100}vw;
+        top: -10px;
+        background: ${colors[Math.floor(Math.random() * colors.length)]};
+        width: ${6 + Math.random() * 8}px;
+        height: ${6 + Math.random() * 8}px;
+        border-radius: ${Math.random() > 0.5 ? '50%' : '2px'};
+        animation-duration: ${1.5 + Math.random() * 2}s;
+        animation-delay: ${Math.random() * 0.5}s;
+      `;
+      document.body.appendChild(piece);
+      setTimeout(() => piece.remove(), 3000);
+    }, i * 20);
+  }
 }
 
 // ===== INITIALIZE =====
@@ -361,11 +446,48 @@ document.addEventListener('DOMContentLoaded', function() {
   const navMenu = document.getElementById('navMenu');
   if (navToggle && navMenu) {
     navToggle.addEventListener('click', () => navMenu.classList.toggle('open'));
+    document.addEventListener('click', (e) => {
+      if (!navToggle.contains(e.target) && !navMenu.contains(e.target)) {
+        navMenu.classList.remove('open');
+      }
+    });
   }
   window.addEventListener('scroll', () => {
     const navbar = document.getElementById('navbar');
     if (navbar) navbar.classList.toggle('scrolled', window.scrollY > 50);
+  }, { passive: true });
+
+  // Scroll reveal
+  initScrollReveal();
+  initProgressBars();
+  initHeroCounters();
+
+  // Add reveal classes to cards dynamically
+  document.querySelectorAll('.overview-card, .tier-card, .subject-card, .faq-item').forEach((el, i) => {
+    el.classList.add('reveal');
+    el.style.transitionDelay = `${(i % 4) * 0.08}s`;
+    // Trigger observer re-check
   });
+  // Re-run scroll reveal after adding classes
+  setTimeout(initScrollReveal, 50);
+
+  // FAQ toggle
+  window.toggleFaq = function(btn) {
+    const answer = btn.nextElementSibling;
+    const isOpen = answer.classList.contains('show');
+    document.querySelectorAll('.faq-a').forEach(a => a.classList.remove('show'));
+    document.querySelectorAll('.faq-q').forEach(q => {
+      q.classList.remove('open');
+      const icon = q.querySelector('.faq-icon');
+      if (icon) icon.textContent = '+';
+    });
+    if (!isOpen) {
+      answer.classList.add('show');
+      btn.classList.add('open');
+      const icon = btn.querySelector('.faq-icon');
+      if (icon) icon.textContent = '×';
+    }
+  };
 
   // Init quiz if on quiz page
   if (document.getElementById('quizApp')) {
