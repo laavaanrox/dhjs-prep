@@ -1,116 +1,99 @@
-// ===== AUTH UI — Navbar login button & profile dropdown =====
+// ===== AUTH UI =====
 
 function initAuthUI() {
   if (!window.FirebaseApp) return;
-
   const ok = window.FirebaseApp.init();
-  if (!ok) { console.warn('Firebase not loaded'); return; }
+  if (!ok) { console.warn('Firebase SDK not loaded'); return; }
 
-  // Inject the auth nav item if the navbar exists
-  injectAuthButton();
+  injectAuthItem();
 
-  // Listen for auth changes
   window.FirebaseApp.onUserChange(user => {
-    updateNavbar(user);
-    // Trigger dashboard refresh if on progress page
+    updateAuthItem(user);
     if (typeof renderDashboard === 'function') renderDashboard(user);
   });
 }
 
-function injectAuthButton() {
+function injectAuthItem() {
   const menu = document.getElementById('navMenu');
   if (!menu) return;
-  // Remove any existing auth item
-  const existing = document.getElementById('authNavItem');
-  if (existing) existing.remove();
+  if (document.getElementById('authNavItem')) return;
 
   const li = document.createElement('li');
   li.id = 'authNavItem';
-  li.innerHTML = `
-    <div class="auth-nav-wrap" id="authNavWrap">
-      <button class="nav-link auth-login-btn" id="authLoginBtn" onclick="handleAuthClick()">
-        <span>🔐 Sign In</span>
-      </button>
-    </div>`;
-  // Insert before the CTA button (last item)
+  li.innerHTML = `<a href="#" class="nav-link auth-login-btn" id="authLoginBtn" onclick="event.preventDefault();handleAuthClick()">Sign In</a>`;
+
   const cta = menu.querySelector('.cta-btn')?.parentElement;
   if (cta) menu.insertBefore(li, cta);
   else menu.appendChild(li);
 }
 
-function updateNavbar(user) {
-  const wrap = document.getElementById('authNavWrap');
-  if (!wrap) return;
+function updateAuthItem(user) {
+  const li = document.getElementById('authNavItem');
+  if (!li) return;
+
   if (user) {
-    const initial = (user.displayName || user.email || 'U')[0].toUpperCase();
+    const name = (user.displayName || user.email || 'User').split(' ')[0];
     const photo = user.photoURL;
-    wrap.innerHTML = `
-      <div class="auth-profile-btn" id="authProfileBtn" onclick="toggleProfileMenu()">
-        ${photo
-          ? `<img src="${photo}" class="auth-avatar" alt="${user.displayName}" referrerpolicy="no-referrer">`
-          : `<div class="auth-avatar auth-avatar-initial">${initial}</div>`}
-        <span class="auth-name">${(user.displayName || user.email || '').split(' ')[0]}</span>
-        <span class="auth-caret">▾</span>
-      </div>
-      <div class="auth-dropdown" id="authDropdown">
-        <div class="auth-dropdown-header">
-          ${photo ? `<img src="${photo}" class="auth-dropdown-avatar" referrerpolicy="no-referrer">` : `<div class="auth-dropdown-avatar auth-avatar-initial">${initial}</div>`}
-          <div>
-            <div class="auth-dropdown-name">${user.displayName || 'User'}</div>
-            <div class="auth-dropdown-email">${user.email || ''}</div>
+    const initial = name[0].toUpperCase();
+
+    li.innerHTML = `
+      <div class="auth-menu-wrap">
+        <button class="auth-avatar-btn" id="authAvatarBtn" onclick="toggleAuthDropdown(event)">
+          ${photo
+            ? `<img src="${photo}" class="auth-avatar-img" referrerpolicy="no-referrer" alt="${name}">`
+            : `<span class="auth-avatar-fallback">${initial}</span>`}
+          <span class="auth-user-name">${name}</span>
+          <span class="auth-chevron">▾</span>
+        </button>
+        <div class="auth-dropdown-menu" id="authDropdownMenu">
+          <div class="auth-dropdown-user">
+            ${photo ? `<img src="${photo}" referrerpolicy="no-referrer" class="auth-dropdown-photo">` : `<span class="auth-dropdown-photo auth-avatar-fallback" style="font-size:1.1rem">${initial}</span>`}
+            <div>
+              <div class="auth-dropdown-name">${user.displayName || 'User'}</div>
+              <div class="auth-dropdown-email">${user.email || ''}</div>
+            </div>
           </div>
+          <a href="progress.html" class="auth-dropdown-link">📊 My Progress</a>
+          <button class="auth-dropdown-link auth-signout-btn" onclick="handleSignOut()">🚪 Sign Out</button>
         </div>
-        <a href="progress.html" class="auth-dropdown-item">📊 My Progress</a>
-        <button class="auth-dropdown-item auth-dropdown-signout" onclick="handleSignOut()">🚪 Sign Out</button>
       </div>`;
   } else {
-    wrap.innerHTML = `
-      <button class="nav-link auth-login-btn" id="authLoginBtn" onclick="handleAuthClick()">
-        <span>🔐 Sign In</span>
-      </button>`;
+    li.innerHTML = `<a href="#" class="nav-link auth-login-btn" id="authLoginBtn" onclick="event.preventDefault();handleAuthClick()">Sign In</a>`;
   }
 }
 
-function toggleProfileMenu() {
-  const dropdown = document.getElementById('authDropdown');
-  if (!dropdown) return;
-  dropdown.classList.toggle('open');
-  // Close on outside click
-  setTimeout(() => {
-    document.addEventListener('click', closeProfileMenu, { once: true });
-  }, 10);
+function toggleAuthDropdown(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('authDropdownMenu');
+  if (!menu) return;
+  const isOpen = menu.classList.contains('open');
+  closeAllDropdowns();
+  if (!isOpen) {
+    menu.classList.add('open');
+    setTimeout(() => document.addEventListener('click', closeAllDropdowns, { once: true }), 0);
+  }
 }
 
-function closeProfileMenu(e) {
-  const dropdown = document.getElementById('authDropdown');
-  const btn = document.getElementById('authProfileBtn');
-  if (dropdown && !dropdown.contains(e.target) && !btn?.contains(e.target)) {
-    dropdown.classList.remove('open');
-  }
+function closeAllDropdowns() {
+  document.querySelectorAll('.auth-dropdown-menu').forEach(m => m.classList.remove('open'));
 }
 
 async function handleAuthClick() {
+  const btn = document.getElementById('authLoginBtn');
+  if (btn) { btn.textContent = 'Signing in...'; btn.style.opacity = '0.7'; }
   const user = await window.FirebaseApp.signInWithGoogle();
-  if (user) {
-    // If on progress page, reload
-    if (window.location.pathname.includes('progress')) {
-      renderDashboard(user);
-    }
-  }
+  if (!user && btn) { btn.textContent = 'Sign In'; btn.style.opacity = '1'; }
+  if (user && window.location.pathname.includes('progress')) renderDashboard(user);
 }
 
 async function handleSignOut() {
+  closeAllDropdowns();
   await window.FirebaseApp.signOutUser();
-  // Redirect to home if on progress page
-  if (window.location.pathname.includes('progress')) {
-    window.location.href = 'index.html';
-  }
+  if (window.location.pathname.includes('progress')) window.location.href = 'index.html';
 }
 
-// Make global
 window.handleAuthClick = handleAuthClick;
 window.handleSignOut = handleSignOut;
-window.toggleProfileMenu = toggleProfileMenu;
+window.toggleAuthDropdown = toggleAuthDropdown;
 
-// Auto-init after DOM ready
 document.addEventListener('DOMContentLoaded', initAuthUI);
