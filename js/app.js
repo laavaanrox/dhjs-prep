@@ -305,7 +305,14 @@ function initQuizPage() {
     engine.stopTimer();
     const r = engine.getResults();
     const subject = selectedSubject;
-    Storage.updateStats(subject, r.correct, r.answered);
+    // Save to Firebase if logged in, else localStorage
+    const sessionPayload = { subject, correct: r.correct, total: r.total, pct: r.pct };
+    const fbUser = window.FirebaseApp?.getCurrentUser();
+    if (fbUser && window.FirebaseApp) {
+      window.FirebaseApp.saveSession(fbUser, sessionPayload);
+    } else {
+      Storage.updateStats(subject, r.correct, r.total);
+    }
 
     const grade = r.pct >= 80 ? 'excellent' : r.pct >= 60 ? 'good' : 'needs-work';
     const gradeLabel = r.pct >= 80 ? '🏆 Excellent!' : r.pct >= 60 ? '👍 Good Job!' : '📖 Keep Practicing';

@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Progress — DHJS Prep Dashboard</title>
+  <meta name="description" content="Track your DHJS exam preparation progress. View scores, accuracy by subject, session history and improvement over time.">
+  <meta name="robots" content="noindex">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <!-- Google Analytics 4 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-RBGWS6FZR7"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-RBGWS6FZR7');
+  </script>
+
+  <!-- Firebase Compat SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* ===== PROGRESS PAGE SPECIFIC STYLES ===== */
+    .progress-page { padding-top: 68px; background: var(--bg); min-height: 100vh; }
+
+    .progress-hero {
+      background: linear-gradient(135deg, #050d2e 0%, #0f1f5c 50%, #1e3a8a 100%);
+      padding: 48px 24px 80px; text-align: center; position: relative; overflow: hidden;
+    }
+    .progress-hero::before {
+      content: ''; position: absolute; inset: 0;
+      background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .progress-hero h1 { color: white; position: relative; margin-bottom: 8px; font-size: clamp(1.8rem,4vw,2.8rem); }
+    .progress-hero p { color: rgba(255,255,255,0.7); position: relative; }
+
+    /* Pull-up cards */
+    .dashboard-grid {
+      max-width: 1100px; margin: -44px auto 0; padding: 0 24px 60px;
+      display: flex; flex-direction: column; gap: 28px; position: relative; z-index: 10;
+    }
+
+    /* ===== SUMMARY CARDS ROW ===== */
+    .summary-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; }
+    .summary-card {
+      background: white; border-radius: 18px; padding: 24px 20px; text-align: center;
+      box-shadow: 0 8px 32px rgba(30,58,138,0.1); border: 1px solid rgba(30,58,138,0.06);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .summary-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(30,58,138,0.15); }
+    .summary-card .sc-icon { font-size: 2rem; margin-bottom: 10px; display: block; }
+    .summary-card .sc-val {
+      font-size: 2.6rem; font-weight: 900; line-height: 1; margin-bottom: 6px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .summary-card .sc-val.green { background: linear-gradient(135deg, #059669, #10b981); -webkit-background-clip: text; background-clip: text; }
+    .summary-card .sc-val.amber { background: linear-gradient(135deg, #d97706, var(--accent)); -webkit-background-clip: text; background-clip: text; }
+    .summary-card .sc-val.red { background: linear-gradient(135deg, #dc2626, #ef4444); -webkit-background-clip: text; background-clip: text; }
+    .summary-card .sc-label { font-size: 0.78rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; }
+
+    /* ===== PANEL ===== */
+    .panel {
+      background: white; border-radius: 20px;
+      box-shadow: 0 4px 24px rgba(30,58,138,0.08);
+      border: 1px solid rgba(30,58,138,0.06); overflow: hidden;
+    }
+    .panel-header {
+      padding: 20px 28px; border-bottom: 1px solid var(--border-light);
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    }
+    .panel-header h2 { font-size: 1.15rem; color: var(--text); }
+    .panel-body { padding: 28px; }
+
+    /* ===== SUBJECT ACCURACY BARS ===== */
+    .subject-bars { display: flex; flex-direction: column; gap: 14px; }
+    .subject-bar-row { display: grid; grid-template-columns: 160px 1fr 60px; align-items: center; gap: 14px; }
+    .subject-bar-name { font-size: 0.82rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 6px; }
+    .subject-bar-track { height: 12px; background: var(--bg); border-radius: 6px; overflow: hidden; }
+    .subject-bar-fill {
+      height: 100%; border-radius: 6px;
+      background: linear-gradient(90deg, var(--primary-light), var(--accent));
+      transform: scaleX(0); transform-origin: left;
+      transition: transform 1s cubic-bezier(0.4,0,0.2,1);
+    }
+    .subject-bar-fill.animated { transform: scaleX(1); }
+    .subject-bar-fill.great { background: linear-gradient(90deg, #059669, #10b981); }
+    .subject-bar-fill.good { background: linear-gradient(90deg, var(--primary-light), #60a5fa); }
+    .subject-bar-fill.warn { background: linear-gradient(90deg, #d97706, var(--accent)); }
+    .subject-bar-fill.low { background: linear-gradient(90deg, #dc2626, #ef4444); }
+    .subject-bar-pct { font-size: 0.85rem; font-weight: 800; color: var(--text); text-align: right; }
+    .subject-bar-count { font-size: 0.72rem; color: var(--text-muted); }
+    .no-data-row { color: var(--text-muted); font-size: 0.85rem; font-style: italic; padding: 8px 0; }
+
+    /* ===== HISTORY CHART ===== */
+    .chart-wrap { overflow-x: auto; }
+    .score-chart {
+      display: flex; align-items: flex-end; gap: 8px;
+      min-height: 140px; padding: 16px 0 8px;
+      min-width: max-content;
+    }
+    .chart-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 5px; min-width: 40px; }
+    .chart-bar-outer { width: 32px; height: 120px; background: var(--bg); border-radius: 6px; display: flex; align-items: flex-end; overflow: hidden; position: relative; }
+    .chart-bar-inner {
+      width: 100%; border-radius: 6px; position: absolute; bottom: 0;
+      transition: height 0.8s cubic-bezier(0.4,0,0.2,1);
+      background: linear-gradient(180deg, var(--primary-light), var(--primary));
+    }
+    .chart-bar-inner.great { background: linear-gradient(180deg, #10b981, #059669); }
+    .chart-bar-inner.good { background: linear-gradient(180deg, #60a5fa, var(--primary-light)); }
+    .chart-bar-inner.warn { background: linear-gradient(180deg, var(--accent), #d97706); }
+    .chart-bar-inner.low { background: linear-gradient(180deg, #ef4444, #dc2626); }
+    .chart-bar-label { font-size: 0.65rem; color: var(--text-muted); font-weight: 600; text-align: center; }
+    .chart-bar-pct { font-size: 0.7rem; font-weight: 800; color: var(--text); }
+
+    /* ===== SESSION HISTORY TABLE ===== */
+    .history-table { width: 100%; border-collapse: collapse; }
+    .history-table th {
+      text-align: left; padding: 10px 16px; font-size: 0.72rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted);
+      background: var(--bg); border-bottom: 2px solid var(--border);
+    }
+    .history-table td { padding: 13px 16px; border-bottom: 1px solid var(--border-light); font-size: 0.875rem; vertical-align: middle; }
+    .history-table tr:last-child td { border-bottom: none; }
+    .history-table tr:hover td { background: #f8faff; }
+    .pct-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 48px; height: 28px; border-radius: 6px; font-size: 0.8rem; font-weight: 800;
+    }
+    .pct-badge.great { background: #d1fae5; color: #059669; }
+    .pct-badge.good { background: #dbeafe; color: #1d4ed8; }
+    .pct-badge.warn { background: #fef3c7; color: #d97706; }
+    .pct-badge.low { background: #fee2e2; color: #dc2626; }
+    .subj-chip {
+      display: inline-block; padding: 3px 10px; border-radius: 100px;
+      font-size: 0.73rem; font-weight: 700; background: #eff6ff; color: var(--primary-light);
+      border: 1px solid #bfdbfe;
+    }
+
+    /* ===== ACHIEVEMENTS ===== */
+    .achievements-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; }
+    .achievement {
+      text-align: center; padding: 20px 14px; border-radius: 14px;
+      border: 2px solid var(--border); transition: all 0.25s ease;
+      position: relative; overflow: hidden;
+    }
+    .achievement.unlocked { border-color: var(--accent); background: linear-gradient(135deg, #fffbeb, #fef3c7); }
+    .achievement.locked { opacity: 0.45; filter: grayscale(1); }
+    .achievement-icon { font-size: 2.2rem; margin-bottom: 8px; display: block; }
+    .achievement-name { font-size: 0.78rem; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+    .achievement-desc { font-size: 0.68rem; color: var(--text-muted); line-height: 1.4; }
+    .achievement.unlocked .achievement-name { color: #92400e; }
+    .unlocked-badge {
+      position: absolute; top: 8px; right: 8px;
+      background: var(--accent); color: white; font-size: 0.55rem; font-weight: 800;
+      padding: 2px 6px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    /* ===== EMPTY STATE ===== */
+    .empty-state {
+      text-align: center; padding: 60px 24px;
+    }
+    .empty-state-icon { font-size: 4rem; margin-bottom: 16px; display: block; }
+    .empty-state h3 { margin-bottom: 10px; }
+    .empty-state p { margin-bottom: 24px; max-width: 340px; margin-left: auto; margin-right: auto; }
+
+    /* ===== RESET BUTTON ===== */
+    .danger-zone { padding: 20px 28px; border-top: 1px solid var(--border-light); }
+
+    @media (max-width: 640px) {
+      .subject-bar-row { grid-template-columns: 1fr 60px; }
+      .subject-bar-name { grid-column: 1 / -1; margin-bottom: -6px; }
+      .panel-body { padding: 20px 16px; }
+      .history-table th:nth-child(4), .history-table td:nth-child(4) { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar" id="navbar">
+    <div class="nav-container">
+      <a href="index.html" class="nav-brand">
+        <span class="brand-icon">⚖️</span>
+        <span class="brand-text">DHJS<span class="brand-accent">Prep</span></span>
+      </a>
+      <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+      <ul class="nav-menu" id="navMenu">
+        <li><a href="index.html" class="nav-link">Home</a></li>
+        <li><a href="quiz.html" class="nav-link">Practice Quiz</a></li>
+        <li><a href="studyplan.html" class="nav-link">Study Plan</a></li>
+        <li><a href="topics.html" class="nav-link">Topics & Cases</a></li>
+        <li><a href="progress.html" class="nav-link active">My Progress</a></li>
+        <li><a href="quiz.html" class="nav-link cta-btn">Start Practice ▶</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <div class="progress-page">
+    <div class="progress-hero">
+      <h1>📊 My Progress Dashboard</h1>
+      <p>Your DHJS preparation journey, tracked and visualized</p>
+    </div>
+
+    <div class="dashboard-grid" id="dashboardGrid">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+
+  <script src="questions.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/firebase-config.js"></script>
+  <script src="js/auth-ui.js"></script>
+  <script>
+    // renderDashboard is called by auth-ui.js after login state resolves
+    // It can also be called directly (used internally)
+
+    function getGradeClass(pct) {
+      if (pct >= 80) return 'great';
+      if (pct >= 65) return 'good';
+      if (pct >= 45) return 'warn';
+      return 'low';
+    }
+
+    function formatDate(ts) {
+      const d = new Date(ts);
+      return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' });
+    }
+
+    function formatTime(ts) {
+      const d = new Date(ts);
+      return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    const ACHIEVEMENTS = [
+      { id: 'first_quiz', icon: '🎯', name: 'First Step', desc: 'Complete your first quiz', check: (s) => s.sessions.length >= 1 },
+      { id: 'ten_quizzes', icon: '🔟', name: 'Dedicated', desc: 'Complete 10 quizzes', check: (s) => s.sessions.length >= 10 },
+      { id: 'century', icon: '💯', name: 'Century', desc: 'Answer 100 questions', check: (s) => s.totalAnswered >= 100 },
+      { id: 'five_hundred', icon: '🏆', name: 'Law Scholar', desc: 'Answer 500 questions', check: (s) => s.totalAnswered >= 500 },
+      { id: 'perfect', icon: '⭐', name: 'Perfect Score', desc: 'Score 100% in a session', check: (s) => s.sessions.some(x => x.pct === 100) },
+      { id: 'streak_3', icon: '🔥', name: 'On Fire', desc: '3 sessions scoring 80%+', check: (s) => s.sessions.filter(x => x.pct >= 80).length >= 3 },
+      { id: 'all_rounder', icon: '🌟', name: 'All Rounder', desc: 'Practice 6+ subjects', check: (s) => Object.keys(s.subjects).length >= 6 },
+      { id: 'expert', icon: '👨‍⚖️', name: 'Judge Material', desc: 'Overall accuracy 75%+', check: (s) => s.totalAnswered >= 50 && Math.round(s.totalCorrect/s.totalAnswered*100) >= 75 },
+    ];
+
+    async function renderDashboard(user) {
+      const grid = document.getElementById('dashboardGrid');
+      if (!grid) return;
+
+      // If no user passed, check Firebase current user
+      if (user === undefined) {
+        user = window.FirebaseApp?.getCurrentUser() || null;
+      }
+
+      // Show sign-in prompt if not logged in
+      if (!user) {
+        grid.innerHTML = `
+          <div class="signin-prompt">
+            <span class="sp-icon">🔐</span>
+            <h2>Sign in to see your Progress</h2>
+            <p>Your scores, accuracy charts, and session history are saved to your personal profile — accessible from any device.</p>
+            <button class="google-btn" onclick="handleAuthClick()">
+              <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+              Continue with Google
+            </button>
+            <p style="margin-top:20px;font-size:0.8rem;color:var(--text-muted)">Free • No password needed • Your data stays private</p>
+          </div>`;
+        return;
+      }
+
+      // Show loading state
+      grid.innerHTML = `<div style="text-align:center;padding:60px"><div style="font-size:2rem;animation:spin 1s linear infinite;display:inline-block">⚙️</div><p style="margin-top:12px">Loading your dashboard...</p></div>`;
+
+      // Fetch from Firebase
+      let stats = null;
+      if (window.FirebaseApp) {
+        stats = await window.FirebaseApp.getStats(user);
+      }
+      // Fallback to localStorage if Firebase not configured
+      if (!stats) stats = Storage.getStats();
+      if (!stats) stats = { totalAnswered: 0, totalCorrect: 0, subjects: {}, sessions: [] };
+
+      if (stats.totalAnswered === 0) {
+        grid.innerHTML = `
+          <div class="panel">
+            <div class="empty-state">
+              <span class="empty-state-icon">📚</span>
+              <h3>No quizzes taken yet</h3>
+              <p>Start practicing to see your progress, scores, and improvement charts here.</p>
+              <a href="quiz.html" class="btn btn-primary btn-lg">Take Your First Quiz ▶</a>
+            </div>
+          </div>`;
+        return;
+      }
+
+      const overallPct = Math.round(stats.totalCorrect / stats.totalAnswered * 100);
+      const sessions = stats.sessions || [];
+      const bestSession = sessions.reduce((best, s) => s.pct > (best?.pct || 0) ? s : best, null);
+      const recentSessions = [...sessions].reverse().slice(0, 20);
+
+      // ===== SUMMARY ROW =====
+      const summaryHTML = `
+        <div class="summary-row">
+          <div class="summary-card reveal">
+            <span class="sc-icon">🎯</span>
+            <div class="sc-val ${getGradeClass(overallPct)}" data-count="${overallPct}">${overallPct}%</div>
+            <div class="sc-label">Overall Accuracy</div>
+          </div>
+          <div class="summary-card reveal reveal-delay-1">
+            <span class="sc-icon">✅</span>
+            <div class="sc-val green" data-count="${stats.totalCorrect}">${stats.totalCorrect}</div>
+            <div class="sc-label">Correct Answers</div>
+          </div>
+          <div class="summary-card reveal reveal-delay-2">
+            <span class="sc-icon">📝</span>
+            <div class="sc-val" data-count="${stats.totalAnswered}">${stats.totalAnswered}</div>
+            <div class="sc-label">Total Attempted</div>
+          </div>
+          <div class="summary-card reveal reveal-delay-3">
+            <span class="sc-icon">🏅</span>
+            <div class="sc-val amber">${sessions.length}</div>
+            <div class="sc-label">Sessions Completed</div>
+          </div>
+          ${bestSession ? `
+          <div class="summary-card reveal reveal-delay-4">
+            <span class="sc-icon">🌟</span>
+            <div class="sc-val green">${bestSession.pct}%</div>
+            <div class="sc-label">Best Score Ever</div>
+          </div>` : ''}
+        </div>`;
+
+      // ===== SUBJECT BARS =====
+      const subjectEntries = Object.entries(stats.subjects || {})
+        .map(([key, val]) => ({
+          key, val,
+          name: SUBJECTS[key]?.name || key,
+          icon: SUBJECTS[key]?.icon || '📖',
+          pct: Math.round(val.correct / val.answered * 100)
+        }))
+        .sort((a, b) => b.pct - a.pct);
+
+      const subjectBarsHTML = subjectEntries.length ? subjectEntries.map(s => `
+        <div class="subject-bar-row">
+          <div class="subject-bar-name">${s.icon} ${s.name}</div>
+          <div>
+            <div class="subject-bar-track">
+              <div class="subject-bar-fill ${getGradeClass(s.pct)}" style="--target-width:${s.pct}%" data-pct="${s.pct/100}"></div>
+            </div>
+            <div class="subject-bar-count">${s.val.correct}/${s.val.answered} correct</div>
+          </div>
+          <div class="subject-bar-pct">${s.pct}%</div>
+        </div>`).join('') :
+        `<div class="no-data-row">Practice a few subjects first to see accuracy here.</div>`;
+
+      // Best & worst subject callout
+      const best = subjectEntries[0];
+      const worst = subjectEntries[subjectEntries.length - 1];
+      const calloutHTML = subjectEntries.length >= 2 ? `
+        <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
+          <div style="flex:1;min-width:180px;padding:14px 18px;background:#d1fae5;border-radius:12px;border-left:4px solid #059669">
+            <div style="font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:0.8px;color:#059669;margin-bottom:4px">💪 Strongest Subject</div>
+            <div style="font-weight:700;color:#065f46">${best.icon} ${best.name} — ${best.pct}%</div>
+          </div>
+          <div style="flex:1;min-width:180px;padding:14px 18px;background:#fee2e2;border-radius:12px;border-left:4px solid #dc2626">
+            <div style="font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:0.8px;color:#dc2626;margin-bottom:4px">📖 Needs More Work</div>
+            <div style="font-weight:700;color:#7f1d1d">${worst.icon} ${worst.name} — ${worst.pct}%</div>
+          </div>
+        </div>` : '';
+
+      // ===== SCORE CHART (last 15 sessions) =====
+      const chartSessions = [...sessions].slice(-15);
+      const chartBarsHTML = chartSessions.length ? chartSessions.map((s, i) => {
+        const h = Math.round(s.pct * 1.2); // max 120px
+        const cls = getGradeClass(s.pct);
+        const subj = SUBJECTS[s.subject]?.name?.split(' ')[0] || s.subject || 'Mix';
+        return `
+          <div class="chart-bar-wrap">
+            <div class="chart-bar-pct">${s.pct}%</div>
+            <div class="chart-bar-outer">
+              <div class="chart-bar-inner ${cls}" style="height:0" data-height="${h}px"></div>
+            </div>
+            <div class="chart-bar-label">${subj}</div>
+          </div>`;
+      }).join('') : '<p style="color:var(--text-muted);font-size:0.875rem">No sessions yet</p>';
+
+      // ===== SESSION HISTORY =====
+      const historyHTML = recentSessions.length ? `
+        <div style="overflow-x:auto">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Subject</th>
+                <th>Score</th>
+                <th>Date & Time</th>
+                <th>Accuracy</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${recentSessions.map((s, i) => `
+                <tr>
+                  <td style="color:var(--text-muted);font-weight:700">${sessions.length - i}</td>
+                  <td><span class="subj-chip">${SUBJECTS[s.subject]?.icon || '📚'} ${SUBJECTS[s.subject]?.name || 'Mixed'}</span></td>
+                  <td style="font-weight:700">${s.correct} / ${s.total}</td>
+                  <td style="color:var(--text-muted);font-size:0.82rem">${formatDate(s.date)} ${formatTime(s.date)}</td>
+                  <td><span class="pct-badge ${getGradeClass(s.pct)}">${s.pct}%</span></td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>` : '<p style="color:var(--text-muted)">No sessions recorded yet.</p>';
+
+      // ===== ACHIEVEMENTS =====
+      const achievementsHTML = ACHIEVEMENTS.map(a => {
+        const unlocked = a.check(stats);
+        return `
+          <div class="achievement ${unlocked ? 'unlocked' : 'locked'}">
+            ${unlocked ? '<span class="unlocked-badge">✓ Earned</span>' : ''}
+            <span class="achievement-icon">${a.icon}</span>
+            <div class="achievement-name">${a.name}</div>
+            <div class="achievement-desc">${a.desc}</div>
+          </div>`;
+      }).join('');
+
+      // ===== ASSEMBLE DASHBOARD =====
+      grid.innerHTML = `
+        ${summaryHTML}
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px" id="twoColGrid">
+          <!-- Subject Accuracy Panel -->
+          <div class="panel reveal">
+            <div class="panel-header">
+              <h2>📊 Subject Accuracy</h2>
+              <span style="font-size:0.78rem;color:var(--text-muted)">${subjectEntries.length} subjects practiced</span>
+            </div>
+            <div class="panel-body">
+              ${calloutHTML}
+              <div class="subject-bars">${subjectBarsHTML}</div>
+            </div>
+          </div>
+
+          <!-- Score Over Time -->
+          <div class="panel reveal reveal-delay-1">
+            <div class="panel-header">
+              <h2>📈 Score History</h2>
+              <span style="font-size:0.78rem;color:var(--text-muted)">Last ${Math.min(chartSessions.length, 15)} sessions</span>
+            </div>
+            <div class="panel-body">
+              <div class="chart-wrap">
+                <div class="score-chart" id="scoreChart">${chartBarsHTML}</div>
+              </div>
+              <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px">
+                <span style="font-size:0.72rem;color:var(--text-muted);display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;background:#10b981;border-radius:2px"></span>80%+ Excellent</span>
+                <span style="font-size:0.72rem;color:var(--text-muted);display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;background:#60a5fa;border-radius:2px"></span>65–79% Good</span>
+                <span style="font-size:0.72rem;color:var(--text-muted);display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;background:#f59e0b;border-radius:2px"></span>45–64% Fair</span>
+                <span style="font-size:0.72rem;color:var(--text-muted);display:flex;align-items:center;gap:4px"><span style="display:inline-block;width:10px;height:10px;background:#ef4444;border-radius:2px"></span>Below 45%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Achievements -->
+        <div class="panel reveal">
+          <div class="panel-header">
+            <h2>🏆 Achievements</h2>
+            <span style="font-size:0.78rem;color:var(--text-muted)">${ACHIEVEMENTS.filter(a => a.check(stats)).length} / ${ACHIEVEMENTS.length} earned</span>
+          </div>
+          <div class="panel-body">
+            <div class="achievements-grid">${achievementsHTML}</div>
+          </div>
+        </div>
+
+        <!-- Session History -->
+        <div class="panel reveal">
+          <div class="panel-header">
+            <h2>📋 Session History</h2>
+            <a href="quiz.html" class="btn btn-primary btn-sm">+ New Session</a>
+          </div>
+          <div class="panel-body" style="padding:0 0 4px">
+            ${historyHTML}
+          </div>
+          <div class="danger-zone">
+            <button onclick="confirmReset()" style="background:none;border:1px solid var(--danger);color:var(--danger);padding:7px 16px;border-radius:8px;cursor:pointer;font-size:0.8rem;font-weight:700;font-family:inherit;transition:all 0.2s ease" onmouseover="this.style.background='var(--danger)';this.style.color='white'" onmouseout="this.style.background='none';this.style.color='var(--danger)'">
+              🗑️ Reset All Progress
+            </button>
+            <span style="font-size:0.75rem;color:var(--text-muted);margin-left:10px">This cannot be undone</span>
+          </div>
+        </div>
+
+        <div style="text-align:center;padding-bottom:20px">
+          <a href="quiz.html" class="btn btn-primary btn-lg">Continue Practicing ▶</a>
+          <a href="studyplan.html" class="btn btn-secondary btn-lg" style="margin-left:12px">Study Plan 📅</a>
+        </div>
+      `;
+
+      // Make two-col grid responsive
+      const twoCol = document.getElementById('twoColGrid');
+      if (window.innerWidth < 700) twoCol.style.gridTemplateColumns = '1fr';
+
+      // Animate subject bars
+      setTimeout(() => {
+        document.querySelectorAll('.subject-bar-fill').forEach(bar => {
+          const pct = parseFloat(bar.dataset.pct || 0);
+          bar.style.transform = `scaleX(${pct})`;
+        });
+      }, 300);
+
+      // Animate chart bars
+      setTimeout(() => {
+        document.querySelectorAll('.chart-bar-inner').forEach((bar, i) => {
+          setTimeout(() => {
+            bar.style.height = bar.dataset.height;
+          }, i * 60);
+        });
+      }, 400);
+
+      // Scroll reveal
+      initScrollReveal();
+    }
+
+    function confirmReset() {
+      if (confirm('Are you sure you want to reset ALL your progress? This cannot be undone.')) {
+        localStorage.removeItem('dhjs_stats');
+        location.reload();
+      }
+    }
+  </script>
+</body>
+</html>
