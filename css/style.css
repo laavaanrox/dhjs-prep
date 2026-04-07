@@ -740,88 +740,61 @@ a { color: var(--primary-light); text-decoration: none; transition: color var(--
 }
 
 /* ===== AUTH UI ===== */
-.auth-login-btn {
-  background: rgba(255,255,255,0.12) !important;
-  border: 1px solid rgba(255,255,255,0.3) !important;
-  color: rgba(255,255,255,0.9) !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.02em;
-  transition: all var(--transition) !important;
-}
-.auth-login-btn:hover {
-  background: rgba(255,255,255,0.22) !important;
-  color: white !important;
+#authNavItem {
+  display: flex; align-items: center; gap: 6px;
 }
 
-.auth-menu-wrap { position: relative; }
-
-.auth-avatar-btn {
+/* Sign in button */
+.auth-signin-btn {
   display: flex; align-items: center; gap: 8px;
-  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
-  border-radius: 100px; padding: 4px 12px 4px 4px;
-  cursor: pointer; transition: all var(--transition); font-family: inherit;
+  padding: 7px 16px; border-radius: 100px;
+  background: white; color: #3c4043;
+  border: none; font-family: inherit; font-size: 0.85rem; font-weight: 700;
+  cursor: pointer; transition: all 0.2s ease;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+  white-space: nowrap;
 }
-.auth-avatar-btn:hover { background: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.4); }
+.auth-signin-btn:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.2); transform: translateY(-1px); }
+.auth-signin-btn:disabled { cursor: not-allowed; }
 
-.auth-avatar-img {
-  width: 28px; height: 28px; border-radius: 50%; object-fit: cover;
-  border: 2px solid rgba(255,255,255,0.5); display: block;
+/* Signed-in pill */
+.auth-user-pill {
+  display: flex; align-items: center; gap: 7px;
+  padding: 4px 12px 4px 4px; border-radius: 100px;
+  background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25);
+  text-decoration: none; transition: all 0.2s ease;
 }
-.auth-avatar-fallback {
-  width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+.auth-user-pill:hover { background: rgba(255,255,255,0.25); }
+.auth-pill-avatar {
+  width: 26px; height: 26px; border-radius: 50%; object-fit: cover; display: block;
+  border: 2px solid rgba(255,255,255,0.6);
+}
+.auth-pill-initial {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
   background: linear-gradient(135deg, var(--accent), #f97316);
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 0.85rem; color: white;
+  font-weight: 800; font-size: 0.8rem; color: white;
 }
-.auth-user-name {
-  color: white; font-size: 0.85rem; font-weight: 600;
-  max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+.auth-pill-name {
+  color: white; font-size: 0.82rem; font-weight: 600;
+  max-width: 70px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.auth-chevron { color: rgba(255,255,255,0.6); font-size: 0.65rem; }
 
-/* Dropdown */
-.auth-dropdown-menu {
-  display: none; position: absolute; top: calc(100% + 10px); right: 0;
-  background: white; border-radius: 16px; min-width: 240px;
-  box-shadow: 0 16px 48px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.06);
-  overflow: hidden; z-index: 2000;
-  animation: authDropIn 0.18s cubic-bezier(0.4,0,0.2,1);
+/* Sign out X button */
+.auth-signout-pill {
+  width: 26px; height: 26px; border-radius: 50%; border: none;
+  background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8);
+  font-size: 0.7rem; cursor: pointer; transition: all 0.2s ease;
+  display: flex; align-items: center; justify-content: center; font-family: inherit;
+  flex-shrink: 0;
 }
-.auth-dropdown-menu.open { display: block; }
-@keyframes authDropIn {
-  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-.auth-dropdown-user {
-  display: flex; align-items: center; gap: 12px;
-  padding: 16px; background: var(--bg);
-  border-bottom: 1px solid var(--border);
-}
-.auth-dropdown-photo {
-  width: 40px; height: 40px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
-}
-.auth-dropdown-name { font-weight: 700; color: var(--text); font-size: 0.9rem; }
-.auth-dropdown-email { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
-.auth-dropdown-link {
-  display: flex; align-items: center; gap: 10px;
-  padding: 13px 18px; color: var(--text); font-size: 0.875rem; font-weight: 600;
-  transition: background var(--transition); cursor: pointer;
-  width: 100%; text-align: left; background: none; border: none; font-family: inherit;
-  border-bottom: 1px solid var(--border-light);
-}
-.auth-dropdown-link:last-child { border-bottom: none; }
-.auth-dropdown-link:hover { background: var(--bg); }
-.auth-signout-btn { color: var(--danger) !important; }
-.auth-signout-btn:hover { background: #fef2f2 !important; }
+.auth-signout-pill:hover { background: rgba(239,68,68,0.6); color: white; }
 
-/* Mobile: sheet from bottom */
+/* Mobile tweaks */
 @media (max-width: 768px) {
-  .auth-dropdown-menu {
-    position: fixed; top: auto; bottom: 0; left: 0; right: 0;
-    border-radius: 24px 24px 0 0; min-width: unset;
-  }
-  .auth-user-name { display: none; }
-  .auth-chevron { display: none; }
+  .auth-pill-name { display: none; }
+  #authNavItem { justify-content: flex-start; }
+  .auth-signin-btn { background: rgba(255,255,255,0.12); color: white; box-shadow: none; border: 1px solid rgba(255,255,255,0.3); }
 }
 
 /* Sign-in prompt on progress page */
@@ -833,7 +806,6 @@ a { color: var(--primary-light); text-decoration: none; transition: color var(--
 .signin-prompt .sp-icon { font-size: 3.5rem; margin-bottom: 20px; display: block; }
 .signin-prompt h2 { margin-bottom: 10px; }
 .signin-prompt p { max-width: 380px; margin: 0 auto 32px; line-height: 1.7; }
-
 .google-signin-btn {
   display: inline-flex; align-items: center; gap: 14px;
   padding: 14px 32px; background: white;
@@ -846,6 +818,5 @@ a { color: var(--primary-light); text-decoration: none; transition: color var(--
   border-color: #4285f4; box-shadow: 0 4px 20px rgba(66,133,244,0.2);
   transform: translateY(-2px);
 }
-.google-signin-btn svg { flex-shrink: 0; }
 
-/* Spin for loading */
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
