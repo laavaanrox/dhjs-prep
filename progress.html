@@ -19,11 +19,6 @@
     gtag('config', 'G-RBGWS6FZR7');
   </script>
 
-  <!-- Firebase Compat SDK — deferred so they don't block page render -->
-  <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
   <link rel="stylesheet" href="css/style.css">
   <style>
     /* ===== PROGRESS PAGE SPECIFIC STYLES ===== */
@@ -215,10 +210,35 @@
     </div>
   </div>
 
-  <script defer src="questions.js"></script>
-  <script defer src="js/app.js"></script>
-  <script defer src="js/firebase-config.js"></script>
-  <script defer src="js/auth-ui.js"></script>
+  <script>
+    // Inline minimal deps so page renders with zero network wait
+    const SUBJECTS = {
+      all:        { name: 'Mixed / All',       icon: '📚' },
+      crpc:       { name: 'CrPC / BNSS',       icon: '⚖️' },
+      ipc:        { name: 'IPC / BNS',          icon: '🔨' },
+      evidence:   { name: 'Evidence Act',       icon: '📜' },
+      cpc:        { name: 'CPC',                icon: '📋' },
+      constitution:{ name: 'Constitutional Law',icon: '🏛️' },
+      specific:   { name: 'Specific Relief',    icon: '🤝' },
+      transfer:   { name: 'Transfer of Property',icon: '🏠' },
+      limitation: { name: 'Limitation Act',     icon: '⏰' },
+      contract:   { name: 'Contract Act',       icon: '📄' },
+    };
+
+    function getLocalStats() {
+      try { return JSON.parse(localStorage.getItem('dhjs_stats')); } catch(e) { return null; }
+    }
+
+    // Dynamically load scripts in sequence after page renders
+    function loadScripts(urls, done) {
+      if (!urls.length) { if (done) done(); return; }
+      const s = document.createElement('script');
+      s.src = urls[0];
+      s.onload = () => loadScripts(urls.slice(1), done);
+      s.onerror = () => loadScripts(urls.slice(1), done);
+      document.body.appendChild(s);
+    }
+  </script>
   <script>
     // renderDashboard is called by auth-ui.js after login state resolves
     // It can also be called directly (used internally)
@@ -258,7 +278,7 @@
       if (!grid) return;
       try {
         const cloudStats = await window.FirebaseApp.getStats(user);
-        const local = Storage.getStats();
+        const local = getLocalStats();
         // Use cloud data only if it has more sessions (authoritative across devices)
         if (cloudStats && cloudStats.totalAnswered >= (local?.totalAnswered || 0)) {
           buildDashboard(grid, cloudStats, user);
@@ -511,13 +531,21 @@
       }
     }
 
-    // INSTANT RENDER: show local data the moment DOM is ready, no auth wait
+    // INSTANT RENDER: no external scripts needed — reads localStorage directly
     document.addEventListener('DOMContentLoaded', () => {
       const grid = document.getElementById('dashboardGrid');
       if (!grid) return;
-      const local = Storage.getStats();
+      const local = getLocalStats();
       buildDashboard(grid, local || { totalAnswered: 0, totalCorrect: 0, subjects: {}, sessions: [] });
-      // renderDashboard() called by auth-ui.js in background to sync Firebase data
+
+      // Load Firebase + auth in background AFTER page is already rendered
+      loadScripts([
+        'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
+        'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js',
+        'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js',
+        'js/firebase-config.js?v=8',
+        'js/auth-ui.js?v=8'
+      ]);
     });
   </script>
 </body>
