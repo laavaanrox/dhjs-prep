@@ -86,10 +86,82 @@ function formatTime(seconds) {
   return `${m}:${s.toString().padStart(2,'0')}`;
 }
 
+// ===== QUIZ MODULE STATE (module-level so showResults is always accessible) =====
+let _qEngine = null;
+let _qContainer = null;
+let _qSubject = 'all';
+
+function _getSubjectName(key) {
+  if (key === 'all') return 'Mixed (All Subjects)';
+  return (typeof SUBJECTS !== 'undefined' && SUBJECTS[key]?.name) || key;
+}
+
+window.showResults = function() {
+  if (!_qEngine || !_qContainer) return;
+  _qEngine.stopTimer();
+  const r = _qEngine.getResults();
+  const subject = _qSubject;
+  const sessionPayload = { subject, correct: r.correct, total: r.total, pct: r.pct };
+  // Always save locally (instant, reliable, works offline)
+  Storage.updateStats(subject, r.correct, r.total);
+  // Also sync to Firebase if logged in (for cross-device access)
+  const fbUser = window.FirebaseApp?.getCurrentUser();
+  if (fbUser && window.FirebaseApp) {
+    window.FirebaseApp.saveSession(fbUser, sessionPayload);
+  }
+
+  const grade = r.pct >= 80 ? 'excellent' : r.pct >= 60 ? 'good' : 'needs-work';
+  const gradeLabel = r.pct >= 80 ? '🏆 Excellent!' : r.pct >= 60 ? '👍 Good Job!' : '📖 Keep Practicing';
+  const skipped = r.answered - r.correct - r.wrong;
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  _qContainer.innerHTML = `
+    <div class="results-screen fade-in">
+      <div class="results-card">
+        <h2>${gradeLabel}</h2>
+        <div class="score-circle ${grade}">
+          <span class="score-pct">${r.pct}%</span>
+          <span class="score-label-sm">${r.correct}/${r.total}</span>
+        </div>
+        <div class="results-grid">
+          <div class="result-stat">
+            <div class="number" style="color:var(--success)">${r.correct}</div>
+            <div class="label">Correct</div>
+          </div>
+          <div class="result-stat">
+            <div class="number" style="color:var(--danger)">${r.wrong}</div>
+            <div class="label">Wrong</div>
+          </div>
+          <div class="result-stat">
+            <div class="number">${skipped < 0 ? 0 : skipped}</div>
+            <div class="label">Skipped</div>
+          </div>
+        </div>
+        <p style="margin-bottom:8px">Subject: <strong>${_getSubjectName(subject)}</strong></p>
+        <p>Time: <strong>${Math.floor(r.timeTaken/60)}m ${r.timeTaken%60}s</strong></p>
+        ${r.pct < 60 ? `<div style="margin-top:16px;padding:12px;background:#fef2f2;border-radius:8px;font-size:0.9rem">
+          💡 <strong>Tip:</strong> Review the topic in your study plan and try again. Focus on the explanation for each wrong answer.
+        </div>` : ''}
+      </div>
+      <div class="results-actions">
+        <button class="btn btn-primary" onclick="location.reload()">Practice Again 🔄</button>
+        <a href="studyplan.html" class="btn btn-secondary">Study Plan 📅</a>
+        <a href="index.html" class="btn" style="background:white;border:1px solid var(--border)">Home</a>
+      </div>
+    </div>
+  `;
+
+  if (r.pct >= 70) setTimeout(launchConfetti, 400);
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'quiz_complete', { score_pct: r.pct, correct: r.correct, total: r.total, subject });
+  }
+};
+
 // ===== QUIZ PAGE CONTROLLER =====
 function initQuizPage() {
   const container = document.getElementById('quizApp');
   if (!container) return;
+  _qContainer = container;
 
   const params = new URLSearchParams(window.location.search);
   const subjectParam = params.get('subject');
@@ -99,10 +171,7 @@ function initQuizPage() {
   let selectedMode = modeParam || 'practice';
   let engine = null;
 
-  function getSubjectName(key) {
-    if (key === 'all') return 'Mixed (All Subjects)';
-    return SUBJECTS[key]?.name || key;
-  }
+  function getSubjectName(key) { return _getSubjectName(key); }
 
   function renderSetup() {
     const stats = Storage.getStats();
@@ -168,6 +237,8 @@ function initQuizPage() {
       }
       const timePerQ = selectedMode === 'exam' ? 90 : (selectedMode === 'mock' ? 72 : 0);
       engine = new QuizEngine(questions, { timePerQuestion: timePerQ || 9999, mode: selectedMode });
+      _qEngine = engine;
+      _qSubject = selectedSubject;
       renderQuestion();
 
       if (typeof gtag !== 'undefined') {
@@ -227,8 +298,13 @@ function initQuizPage() {
         <div class="quiz-actions" id="quizActions">
           ${engine.options.mode === 'practice' ? `<button class="btn btn-secondary btn-sm" onclick="skipQuestion()" id="skipBtn">Skip →</button>` : ''}
         </div>
+
+        <div id="discussionMount"></div>
       </div>
     `;
+
+    // Load discussion for this question
+    if (typeof loadDiscussion === 'function') loadDiscussion(q.id);
 
     window.selectAnswer = (index) => {
       const result = engine.answer(index);
@@ -251,9 +327,11 @@ function initQuizPage() {
       // Update actions
       const actions = document.getElementById('quizActions');
       if (!engine.isLast) {
-        actions.innerHTML = `<button class="btn btn-primary" onclick="nextQuestion()">Next Question →</button>`;
+        actions.innerHTML = `<button class="btn btn-primary" id="nextBtn">Next Question →</button>`;
+        document.getElementById('nextBtn').addEventListener('click', () => window.nextQuestion());
       } else {
-        actions.innerHTML = `<button class="btn btn-success" onclick="showResults()">See Results 🏆</button>`;
+        actions.innerHTML = `<button class="btn btn-success" id="resultsBtn">See Results 🏆</button>`;
+        document.getElementById('resultsBtn').addEventListener('click', () => window.showResults());
       }
 
       // Track
@@ -298,65 +376,6 @@ function initQuizPage() {
           renderQuestion();
         }
       );
-    }
-  }
-
-  window.showResults = function showResults() {
-    engine.stopTimer();
-    const r = engine.getResults();
-    const subject = selectedSubject;
-    // Save to Firebase if logged in, else localStorage
-    const sessionPayload = { subject, correct: r.correct, total: r.total, pct: r.pct };
-    const fbUser = window.FirebaseApp?.getCurrentUser();
-    if (fbUser && window.FirebaseApp) {
-      window.FirebaseApp.saveSession(fbUser, sessionPayload);
-    } else {
-      Storage.updateStats(subject, r.correct, r.total);
-    }
-
-    const grade = r.pct >= 80 ? 'excellent' : r.pct >= 60 ? 'good' : 'needs-work';
-    const gradeLabel = r.pct >= 80 ? '🏆 Excellent!' : r.pct >= 60 ? '👍 Good Job!' : '📖 Keep Practicing';
-
-    container.innerHTML = `
-      <div class="results-screen fade-in">
-        <div class="results-card">
-          <h2>${gradeLabel}</h2>
-          <div class="score-circle ${grade}">
-            <span class="score-pct">${r.pct}%</span>
-            <span class="score-label-sm">${r.correct}/${r.total}</span>
-          </div>
-          <div class="results-grid">
-            <div class="result-stat">
-              <div class="number" style="color:var(--success)">${r.correct}</div>
-              <div class="label">Correct</div>
-            </div>
-            <div class="result-stat">
-              <div class="number" style="color:var(--danger)">${r.wrong}</div>
-              <div class="label">Wrong</div>
-            </div>
-            <div class="result-stat">
-              <div class="number">${r.answered - r.correct - r.wrong}</div>
-              <div class="label">Skipped</div>
-            </div>
-          </div>
-          <p style="margin-bottom:8px">Subject: <strong>${getSubjectName(subject)}</strong></p>
-          <p>Time: <strong>${Math.floor(r.timeTaken/60)}m ${r.timeTaken%60}s</strong></p>
-          ${r.pct < 60 ? `<div style="margin-top:16px;padding:12px;background:#fef2f2;border-radius:8px;font-size:0.9rem">
-            💡 <strong>Tip:</strong> Review the topic in your study plan and try again. Focus on the explanation for each wrong answer.
-          </div>` : ''}
-        </div>
-        <div class="results-actions">
-          <button class="btn btn-primary" onclick="location.reload()">Practice Again 🔄</button>
-          <a href="studyplan.html" class="btn btn-secondary">Study Plan 📅</a>
-          <a href="index.html" class="btn" style="background:white;border:1px solid var(--border)">Home</a>
-        </div>
-      </div>
-    `;
-
-    if (r.pct >= 70) setTimeout(launchConfetti, 400);
-
-    if (typeof gtag !== 'undefined') {
-      gtag('event', 'quiz_complete', { score_pct: r.pct, correct: r.correct, total: r.total, subject });
     }
   }
 

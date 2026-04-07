@@ -78,7 +78,7 @@ async function saveSessionToCloud(user, sessionData) {
     const session = { ...sessionData, date: Date.now() };
     const subjectKey = sessionData.subject || 'all';
 
-    if (!snap.exists()) {
+    if (!snap.exists) {
       await ref.set({
         uid: user.uid,
         name: user.displayName || '',
@@ -110,12 +110,16 @@ async function getUserStatsFromCloud(user) {
   if (!user || !_db) return null;
   try {
     const snap = await _db.collection('users').doc(user.uid).get();
-    return snap.exists() ? snap.data() : null;
+    return snap.exists ? snap.data() : null;
   } catch (err) {
     console.error('Get stats error', err);
     return null;
   }
 }
+
+// Expose db for discussion module
+function getDb() { return _db; }
+Object.defineProperty(window, '_db', { get: () => _db });
 
 // Always export to window
 window.FirebaseApp = {
