@@ -301,7 +301,7 @@ function initQuizPage() {
     }
   }
 
-  function showResults() {
+  window.showResults = function showResults() {
     engine.stopTimer();
     const r = engine.getResults();
     const subject = selectedSubject;
