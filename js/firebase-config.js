@@ -20,12 +20,13 @@
 // 9. Replace the placeholder values below with your actual values
 
 const FIREBASE_CONFIG = {
-  apiKey: "REPLACE_WITH_YOUR_API_KEY",
-  authDomain: "REPLACE_WITH_YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "REPLACE_WITH_YOUR_PROJECT_ID",
-  storageBucket: "REPLACE_WITH_YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "REPLACE_WITH_YOUR_MESSAGING_SENDER_ID",
-  appId: "REPLACE_WITH_YOUR_APP_ID"
+  apiKey: "AIzaSyC1cHtkbU06jMWfngExsirGuGIFyrkZHrk",
+  authDomain: "dhjs-prep.firebaseapp.com",
+  projectId: "dhjs-prep",
+  storageBucket: "dhjs-prep.firebasestorage.app",
+  messagingSenderId: "706750192136",
+  appId: "1:706750192136:web:01a8c8c1d2b525d2094fbd",
+  measurementId: "G-DP7L1TK1EC"
 };
 
 // ===== INIT =====
